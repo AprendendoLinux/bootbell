@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+# Na remoção, para o serviço (envia o aviso de "monitoramento desativado").
+# Em atualizações não para nada, para não gerar avisos falsos.
+if [ "$1" = "remove" ] && [ -d /run/systemd/system ]; then
+	deb-systemd-invoke stop bootbell.service >/dev/null || true
+fi
+
+exit 0

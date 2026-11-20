@@ -1,0 +1,6 @@
+dist/
+__pycache__/
+*.pyc
+*.deb
+# Nunca versionar uma configuração real (ela contém o token do bot).
+*.local.conf

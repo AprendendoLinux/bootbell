@@ -1,0 +1,21 @@
+Package: bootbell
+Version: @VERSION@
+Architecture: all
+Maintainer: AprendendoLinux <magnatahp@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: python3 (>= 3.6), iproute2, ca-certificates, passwd, init-system-helpers (>= 1.18)
+Section: admin
+Priority: optional
+Homepage: https://github.com/AprendendoLinux/bootbell
+Description: avisa no Telegram quando o computador liga ou desliga
+ O bootbell envia uma mensagem para um chat do Telegram sempre que o
+ computador é ligado, desligado ou reiniciado. Também avisa quando a
+ sessão anterior terminou sem um desligamento normal (queda de energia,
+ travamento ou desligamento forçado).
+ .
+ Recursos:
+  - mostra hostname, endereços IP e tempo ligado;
+  - diferencia reinicialização de desligamento;
+  - guarda avisos que não puderam ser enviados e os entrega no próximo boot;
+  - mensagens personalizáveis em /etc/bootbell/bootbell.conf;
+  - roda como usuário sem privilégios, com o serviço systemd endurecido.

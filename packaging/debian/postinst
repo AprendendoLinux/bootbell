@@ -1,0 +1,68 @@
+#!/bin/sh
+set -e
+
+CONF=/etc/bootbell/bootbell.conf
+UNIT=bootbell.service
+
+if [ "$1" = "configure" ]; then
+	# Usuário de sistema que roda o serviço.
+	if ! getent group bootbell >/dev/null; then
+		groupadd --system bootbell
+	fi
+	if ! getent passwd bootbell >/dev/null; then
+		useradd --system --gid bootbell --no-create-home \
+			--home-dir /nonexistent --shell /usr/sbin/nologin \
+			--comment "bootbell" bootbell
+	fi
+	# O arquivo tem o token do bot: só root e o serviço podem ler.
+	if [ -f "$CONF" ]; then
+		chown root:bootbell "$CONF"
+		chmod 0640 "$CONF"
+	fi
+fi
+
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ]; then
+	# O deb-systemd-helper antigo (Ubuntu 18.04 / Mint 19) só procura units
+	# em /lib/systemd/system. Em sistemas sem /usr unificado, cria um link
+	# de compatibilidade; com /usr unificado o arquivo já existe ali.
+	if [ -d /lib/systemd/system ] && [ ! -e "/lib/systemd/system/$UNIT" ]; then
+		ln -s "/usr/lib/systemd/system/$UNIT" "/lib/systemd/system/$UNIT"
+	fi
+
+	# Mesmo procedimento que o dh_installsystemd gera.
+	deb-systemd-helper unmask "$UNIT" >/dev/null || true
+	# was-enabled retorna verdadeiro em instalações novas.
+	if deb-systemd-helper --quiet was-enabled "$UNIT"; then
+		deb-systemd-helper enable "$UNIT" >/dev/null || true
+	else
+		deb-systemd-helper update-state "$UNIT" >/dev/null || true
+	fi
+
+	if [ -d /run/systemd/system ]; then
+		systemctl --system daemon-reload >/dev/null || true
+		# Em atualizações com o serviço ativo, NÃO reinicia: isso mandaria
+		# avisos falsos de "desativado/ativado". O novo código já é usado
+		# no próximo desligamento.
+		if ! systemctl --quiet is-active "$UNIT" 2>/dev/null; then
+			if bootbell check >/dev/null 2>&1; then
+				if deb-systemd-helper --quiet is-enabled "$UNIT"; then
+					deb-systemd-invoke start "$UNIT" >/dev/null || true
+				fi
+			else
+				cat <<MSG
+
+  bootbell instalado! Para começar a receber os avisos:
+
+    1. Edite $CONF e preencha token e chat_id
+    2. sudo bootbell test
+    3. sudo systemctl start bootbell
+
+  Documentação: man bootbell  |  https://github.com/AprendendoLinux/bootbell
+
+MSG
+			fi
+		fi
+	fi
+fi
+
+exit 0

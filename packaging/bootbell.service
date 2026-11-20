@@ -1,0 +1,40 @@
+[Unit]
+Description=bootbell - avisa quando o computador liga ou desliga
+Documentation=man:bootbell(1) https://github.com/AprendendoLinux/bootbell
+# A rede e o DNS precisam estar no ar no boot e continuar no ar até o aviso
+# de desligamento sair. As dependências "After=" fazem o systemd parar este
+# serviço ANTES da rede, do DNS e do D-Bus durante o desligamento.
+Wants=network-online.target
+After=network-online.target nss-lookup.target dbus.service
+
+[Service]
+# "simple" + RemainAfterExit: o boot não espera o envio terminar, e o
+# serviço continua "ativo" para que o ExecStop rode no desligamento.
+Type=simple
+RemainAfterExit=yes
+ExecStart=/usr/bin/bootbell boot
+ExecStop=/usr/bin/bootbell shutdown
+TimeoutStopSec=30
+
+User=bootbell
+Group=bootbell
+StateDirectory=bootbell
+StateDirectoryMode=0750
+
+# Endurecimento (somente diretivas disponíveis desde o systemd 237).
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

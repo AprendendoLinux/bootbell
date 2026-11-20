@@ -1,0 +1,11 @@
+bootbell (1.0.0) unstable; urgency=medium
+
+  * Primeira versão.
+  * Avisos de boot, desligamento e reinicialização pelo Telegram.
+  * Detecção de desligamento incorreto (queda de energia, travamento).
+  * Fila de mensagens não enviadas, entregues no próximo boot.
+  * Configuração em /etc/bootbell/bootbell.conf com mensagens personalizáveis.
+  * Serviço systemd sem privilégios e endurecido.
+  * Compatível com Debian 10+, Ubuntu 18.04+ e Linux Mint 19+.
+
+ -- AprendendoLinux <magnatahp@gmail.com>  Thu, 19 Nov 2026 23:30:00 -0300
