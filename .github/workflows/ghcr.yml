@@ -1,0 +1,57 @@
+name: Publicar no GitHub Packages
+
+# Executado manualmente: envia o .deb de uma release já publicada para o
+# ghcr.io como artefato OCI (aba "Packages" do repositório).
+#
+# Para baixar o pacote depois:
+#   oras pull ghcr.io/aprendendolinux/bootbell:<versão>
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag da release (ex.: v1.0.0)"
+        required: true
+        default: "v1.0.0"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  ghcr:
+    name: Enviar ${{ inputs.tag }} para o ghcr.io
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o .deb da release e conferir o checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p '*.deb' -p SHA256SUMS
+          sha256sum -c SHA256SUMS
+          ls -l *.deb
+
+      - uses: oras-project/setup-oras@v1
+        with:
+          version: 1.2.0
+
+      - name: Enviar para o ghcr.io
+        env:
+          TAG: ${{ inputs.tag }}
+          ACTOR: ${{ github.actor }}
+          TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${TAG#v}"
+          DEB="bootbell_${VERSION}_all.deb"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "$TOKEN" | oras login ghcr.io -u "$ACTOR" --password-stdin
+          oras push "$IMAGE:$VERSION" \
+            --artifact-type application/vnd.debian.binary-package \
+            --annotation "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --annotation "org.opencontainers.image.title=bootbell" \
+            --annotation "org.opencontainers.image.description=Pacote Debian do bootbell $VERSION: avisa no Telegram quando o computador liga ou desliga" \
+            --annotation "org.opencontainers.image.version=$VERSION" \
+            --annotation "org.opencontainers.image.licenses=MIT" \
+            "$DEB:application/vnd.debian.binary-package"
+          echo "Publicado: $IMAGE:$VERSION" >> "$GITHUB_STEP_SUMMARY"
