@@ -39,6 +39,7 @@ def load_module():
 bootbell = load_module()
 bootbell.RETRY_INITIAL_DELAY = 0.05
 bootbell.RETRY_MAX_DELAY = 0.1
+bootbell.IP_WAIT_INTERVAL = 0.05
 
 TOKEN = "123456:ABCdef"
 
@@ -364,6 +365,46 @@ class LifecycleTests(BaseTest):
         self.assertIn("LIGADO", out)
         self.assertEqual(self.fake.received, [])
         self.assertFalse(os.path.exists(self.state_dir))
+
+    def _late_ipv4(self, calls_without_ipv4):
+        calls = []
+
+        def fake_addresses(patterns):
+            calls.append(1)
+            if len(calls) <= calls_without_ipv4:
+                return [("enp3s0", "2001:db8:20::2")]
+            return [("enp3s0", "10.71.69.2"), ("enp3s0", "2001:db8:20::2")]
+        return calls, fake_addresses
+
+    def test_boot_waits_for_late_dhcp_ipv4(self):
+        # IPv6 fixo já está no ar; o IPv4 do DHCP chega depois.
+        calls, fake = self._late_ipv4(3)
+        with mock.patch.object(bootbell, "get_ip_addresses", fake):
+            self.run_cli("boot")
+        text = self.fake.texts()[0]
+        self.assertIn("• enp3s0: 10.71.69.2, 2001:db8:20::2", text)
+        self.assertEqual(len(calls), 4)
+
+    def test_boot_ipv6_only_gives_up_after_ip_wait(self):
+        self.write_config(general="request_timeout = 2\nip_wait = 0.3\n")
+        calls, fake = self._late_ipv4(10 ** 6)
+        started = time.monotonic()
+        with mock.patch.object(bootbell, "get_ip_addresses", fake):
+            _, _, err = self.run_cli("boot")
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertIn("nenhum endereço IPv4", err)
+        self.assertIn("• enp3s0: 2001:db8:20::2", self.fake.texts()[0])
+
+    def test_ip_wait_zero_and_manual_start_do_not_wait(self):
+        self.write_config(general="request_timeout = 2\nip_wait = 0\n")
+        calls, fake = self._late_ipv4(10 ** 6)
+        with mock.patch.object(bootbell, "get_ip_addresses", fake):
+            self.run_cli("boot")
+            self.write_config()
+            self.system["state"] = "running"
+            self.run_cli("boot")
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(self.fake.texts()), 2)
 
     def test_boot_does_not_block_forever(self):
         self.write_config(api_url="http://127.0.0.1:9")

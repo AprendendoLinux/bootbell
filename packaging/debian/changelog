@@ -1,3 +1,11 @@
+bootbell (1.0.1) unstable; urgency=medium
+
+  * Espera até ip_wait segundos (padrão 60) por um endereço IPv4 antes de
+    montar o aviso de "ligado". Corrige o aviso saindo só com o IPv6 quando
+    o DHCP termina depois do network-online.target.
+
+ -- AprendendoLinux <magnatahp@gmail.com>  Sun, 22 Nov 2026 15:00:00 -0300
+
 bootbell (1.0.0) unstable; urgency=medium
 
   * Primeira versão.

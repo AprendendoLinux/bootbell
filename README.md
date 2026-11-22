@@ -88,12 +88,12 @@ Baixe o pacote da [última release](https://github.com/AprendendoLinux/bootbell/
 e instale com o `apt`, que resolve as dependências sozinho:
 
 ```bash
-wget https://github.com/AprendendoLinux/bootbell/releases/latest/download/bootbell_1.0.0_all.deb
-sudo apt install ./bootbell_1.0.0_all.deb
+wget https://github.com/AprendendoLinux/bootbell/releases/latest/download/bootbell_1.0.1_all.deb
+sudo apt install ./bootbell_1.0.1_all.deb
 ```
 
 > **Ubuntu 18.04 / Debian 10:** se o seu `apt` for antigo e não aceitar um
-> caminho de arquivo, use `sudo dpkg -i bootbell_1.0.0_all.deb && sudo apt-get -f install`.
+> caminho de arquivo, use `sudo dpkg -i bootbell_1.0.1_all.deb && sudo apt-get -f install`.
 
 O pacote instala:
 
@@ -163,6 +163,7 @@ opção. Resumo:
 | | `ipv4_only` | `no` | Fala com o Telegram somente por IPv4. |
 | | `request_timeout` | `10` | Tempo máximo de cada tentativa, em segundos. |
 | | `boot_retry_for` | `300` | Por quanto tempo tentar enviar no boot. |
+| | `ip_wait` | `60` | No boot, quanto tempo esperar um IPv4 (DHCP) antes de montar o aviso. `0` desativa. |
 | | `shutdown_timeout` | `20` | Tempo máximo para enviar no desligamento. |
 | `[messages]` | `boot`, `shutdown`, `unclean`, `started`, `stopped`, `test`, `delayed` | textos em português | Modelos das mensagens. |
 
@@ -307,6 +308,16 @@ O `chat_id` está errado ou você ainda não mandou nenhuma mensagem para o bot
 O bootbell espera o `network-online.target`. Se a sua distribuição não tiver o
 serviço de espera da rede habilitado, ele começa antes e fica tentando de novo.
 Confira com `systemctl is-enabled NetworkManager-wait-online systemd-networkd-wait-online`.
+</details>
+
+<details>
+<summary><b>O aviso de "ligou" sai sem o endereço IPv4</b></summary>
+
+Acontece quando a rede é dada como pronta antes do DHCP terminar, por exemplo
+com IPv6 fixo e IPv4 por DHCP no NetworkManager (`ipv4.may-fail=yes`, o padrão).
+Desde a versão 1.0.1 o bootbell espera até `ip_wait` segundos (padrão 60) por
+um IPv4 antes de montar o aviso. Se o seu DHCP demora mais, aumente `ip_wait`.
+Em máquinas somente IPv6, use `ip_wait = 0` para não esperar à toa.
 </details>
 
 <details>

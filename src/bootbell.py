@@ -27,7 +27,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 DEFAULT_CONFIG = "/etc/bootbell/bootbell.conf"
 DEFAULT_STATE_DIR = "/var/lib/bootbell"
@@ -43,6 +43,9 @@ RETRY_MAX_DELAY = 30.0
 # Se não for possível consultar o systemd, uma máquina ligada há menos
 # que isso é considerada "em processo de boot".
 BOOT_UPTIME_FALLBACK = 600
+
+# Intervalo entre verificações enquanto espera o IPv4 aparecer no boot.
+IP_WAIT_INTERVAL = 1.0
 
 BOOTING_STATES = ("initializing", "starting")
 RUNNING_STATES = ("running", "degraded", "maintenance")
@@ -85,6 +88,7 @@ DEFAULTS = collections.OrderedDict([
         ("ipv4_only", "no"),
         ("request_timeout", "10"),
         ("boot_retry_for", "300"),
+        ("ip_wait", "60"),
         ("shutdown_timeout", "20"),
     ])),
     ("telegram", collections.OrderedDict([
@@ -148,6 +152,16 @@ def _positive_float(section, key):
     return value
 
 
+def _non_negative_float(section, key):
+    try:
+        value = section.getfloat(key)
+    except ValueError:
+        raise ConfigError("[{}] {} deve ser um número".format(section.name, key))
+    if value < 0:
+        raise ConfigError("[{}] {} não pode ser negativo".format(section.name, key))
+    return value
+
+
 def _boolean(section, key):
     try:
         return section.getboolean(key)
@@ -181,6 +195,7 @@ class Config(object):
         self.ipv4_only = _boolean(general, "ipv4_only")
         self.request_timeout = _positive_float(general, "request_timeout")
         self.boot_retry_for = _positive_float(general, "boot_retry_for")
+        self.ip_wait = _non_negative_float(general, "ip_wait")
         self.shutdown_timeout = _positive_float(general, "shutdown_timeout")
 
         telegram = parser["telegram"]
@@ -488,6 +503,32 @@ def get_ip_addresses(ignore_patterns):
     return []
 
 
+def has_ipv4(addresses):
+    return any(":" not in address for _, address in addresses)
+
+
+def wait_for_ipv4(config):
+    """No boot, espera até config.ip_wait segundos por um IPv4 global.
+
+    O network-online.target pode ser atingido antes do DHCP terminar (ex.:
+    IPv6 fixo e IPv4 por DHCP no NetworkManager com ipv4.may-fail=yes). Sem
+    esta espera, o aviso de "ligado" sairia sem o endereço IPv4.
+    Retorna a lista de endereços encontrada por último.
+    """
+    deadline = time.monotonic() + config.ip_wait
+    addresses = get_ip_addresses(config.ignore_interfaces)
+    if has_ipv4(addresses) or config.ip_wait <= 0:
+        return addresses
+    log("aguardando um endereço IPv4 (até {:g}s)".format(config.ip_wait))
+    while time.monotonic() < deadline:
+        time.sleep(min(IP_WAIT_INTERVAL, max(0.0, deadline - time.monotonic())))
+        addresses = get_ip_addresses(config.ignore_interfaces)
+        if has_ipv4(addresses):
+            return addresses
+    log("nenhum endereço IPv4 apareceu em {:g}s; seguindo sem ele".format(config.ip_wait))
+    return addresses
+
+
 # --------------------------------------------------------------------------
 # Formatação
 # --------------------------------------------------------------------------
@@ -544,15 +585,17 @@ def format_timestamp(config, timestamp):
                              time.strftime(config.time_format, moment))
 
 
-def build_values(config, now=None):
+def build_values(config, now=None, addresses=None):
     now = time.time() if now is None else now
+    if addresses is None:
+        addresses = get_ip_addresses(config.ignore_interfaces)
     moment = time.localtime(now)
     return {
         "host": config.hostname,
         "date": time.strftime(config.date_format, moment),
         "time": time.strftime(config.time_format, moment),
         "uptime": format_duration(uptime_seconds()),
-        "ips": format_ips(get_ip_addresses(config.ignore_interfaces)),
+        "ips": format_ips(addresses),
         "version": __version__,
     }
 
@@ -602,8 +645,11 @@ def print_messages(texts):
 # --------------------------------------------------------------------------
 
 def cmd_boot(config, state, notifier, dry_run):
-    values = build_values(config)
     booting = is_booting()
+    addresses = None
+    if booting and not dry_run:
+        addresses = wait_for_ipv4(config)
+    values = build_values(config, addresses=addresses)
     current_boot = boot_id()
     previous = state.load_session()
 

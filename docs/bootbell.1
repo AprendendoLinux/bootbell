@@ -1,4 +1,4 @@
-.TH BOOTBELL 1 "novembro de 2026" "bootbell 1.0.0" "Comandos do usuário"
+.TH BOOTBELL 1 "novembro de 2026" "bootbell 1.0.1" "Comandos do usuário"
 .SH NOME
 bootbell \- avisa no Telegram quando o computador liga ou desliga
 .SH SINOPSE
@@ -34,7 +34,10 @@ desligamento) são guardados e entregues no próximo boot.
 .TP
 .B boot
 Envia as mensagens guardadas na fila, o aviso de desligamento incorreto
-(se for o caso) e o aviso de "ligado". Se o serviço for iniciado à mão,
+(se for o caso) e o aviso de "ligado". Antes de montar o aviso, espera até
+.I ip_wait
+segundos por um endereço IPv4 (o DHCP pode terminar depois de a rede ser
+dada como pronta). Se o serviço for iniciado à mão,
 com o sistema já no ar, envia "monitoramento ativado". Continua tentando
 por até
 .I boot_retry_for
@@ -72,7 +75,7 @@ O arquivo
 tem o formato INI, com as seções
 .BR [telegram] " (token, chat_id, silent),"
 .BR [general] " (hostname, formatos de data e hora, interfaces ignoradas,"
-ipv4_only e tempos limite) e
+ipv4_only, ip_wait e tempos limite) e
 .BR [messages] " (modelos das mensagens)."
 O próprio arquivo explica cada opção.
 .PP
